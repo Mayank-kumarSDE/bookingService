@@ -1,14 +1,21 @@
 import * as z from "zod";
+import logger from "../config/logger.config.js";
+import { attachCorrelationIdMiddleware} from '../middleware/corelation.middleware.js'
 
 const validateRequestBody = (schema) => {
   return async (req, res, next) => {
     try {
+      logger.info('Validating request body');
       await schema.parseAsync(req.body);
-      console.log("✓ Request body is valid");
+      logger.info('✓ Request body is valid',);
       next();
-    } 
-    catch (err) {
+    } catch (err) {
+      // Log the actual error to see what it is
+      logger.error('Validation error:', err);
+      logger.error('Error type:', err.constructor.name);
+      
       if (err instanceof z.ZodError) {
+        logger.error('ZodError detected, errors array:', err.errors);
         return res.status(400).json({
           status: "fail",
           message: "Validation failed",
@@ -18,6 +25,8 @@ const validateRequestBody = (schema) => {
           }))
         });
       }
+      
+      // For non-Zod errors
       return res.status(500).json({
         status: "error",
         message: "Internal server error"
