@@ -19,7 +19,6 @@
 - 🪪 Correlation ID tracking via **AsyncLocalStorage** (no context prop-drilling!)
 - 📝 structured logging with winston/pino
 - 🚀 scalable folder structure for microservices
-- 🧪 ready for unit/integration testing
 
 ## 🛠 prerequisites
 - node.js >= 18.x
@@ -50,11 +49,9 @@ backendTemplate/
 │   ├── config/         # environment & app config
 │   ├── controllers/    # request handlers
 │   ├── middlewares/    # custom middleware (auth, validation, logger)
-│   ├── routes/         # API route definitions
+│   ├── router/         # API route definitions
 │   ├── utils/          # helpers (correlationId, logger)
-│   └── app.js          # express app setup
-├── tests/              # test files
-├── .env.example        # env template
+│   └── validators      # express app setup               
 ├── .gitignore
 ├── package.json
 └── README.md
