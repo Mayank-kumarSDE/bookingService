@@ -16,7 +16,7 @@
 
 ## ✨ features
 - 🔐 request validation with zod/joi
-- 🪪 automatic correlation-id generation for request tracing
+- 🪪 Correlation ID tracking via **AsyncLocalStorage** (no context prop-drilling!)
 - 📝 structured logging with winston/pino
 - 🚀 scalable folder structure for microservices
 - 🧪 ready for unit/integration testing
@@ -26,28 +26,19 @@
 - npm >= 9.x
 
 ## 📦 installation
-
-1. clone the repository
-   ```bash
-   git clone https://github.com/Mayank-kumarSDE/backendTemplate.git
-   cd backendTemplate
-   ```
-
-2. install dependencies
 ``` bash
-    npm install
+    1. clone the repository
+    git clone https://github.com/Mayank-kumarSDE/backendTemplate.git
+    cd backendTemplate
+    2. install dependencies
+        npm install
+    3. configure environment variables
+        echo "PORT=3000" >> .env
+        # add other vars as needed
+    4. start the development server
+        npm run server
 ```
 
-3. configure environment variables
-`` bash
-    echo "PORT=3000" >> .env
-    # add other vars as needed
-```
-
-4. start the development server
-``` bash 
-    npm run server
-```
 ## environment Variables
 ``` bash
         PORT=""
@@ -110,3 +101,29 @@ backendTemplate/
     Is returned in API responses for debugging
     💡 Pro tip: Forward x-correlation-id in microservice calls for end-to-end tracing.
 ```
+
+
+## 🔗 Correlation ID Logging with AsyncLocalStorage
+
+This template uses Node.js [`AsyncLocalStorage`](https://nodejs.org/api/async_context.html#class-asynclocalstorage) to manage request context automatically.
+
+### How it works:
+1. Middleware extracts/generates a `correlationId` from the `x-correlation-id` header
+2. Stores it in ALS context for the entire request lifecycle
+3. Logger automatically injects `correlationId` into every log line
+4. API responses include `correlationId` for client-side debugging
+
+### Benefits:
+- ✅ No need to pass `correlationId` manually through services/controllers
+- ✅ Works across `async/await`, promises, and event emitters
+- ✅ Safe for concurrent requests (context is isolated per async chain)
+
+### Example usage in any module:
+```js
+import { getCorrelationId } from '../utils/context.js';
+
+const handler = (req, res) => {
+  const cid = getCorrelationId(); // works anywhere in the async call stack!
+  logger.info('Processing user request', { cid, userId: req.user.id });
+  // ...
+};
