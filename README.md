@@ -94,3 +94,30 @@ Correlation ID: A unique identifier for tracking requests across logs
    ```bash
    git clone https://github.com/Mayank-kumarSDE/backendTemplate.git
    cd backendTemplate
+
+2. install dependencies
+``` bash
+    npm install
+
+3. configure environment variables
+`` bash
+    echo "PORT=3000" >> .env
+    # add other vars as needed
+4. start the development server
+``` bash 
+    npm run server
+
+## Folder structure
+backendTemplate/
+├── src/
+│   ├── config/         # environment & app config
+│   ├── controllers/    # request handlers
+│   ├── middlewares/    # custom middleware (auth, validation, logger)
+│   ├── routes/         # API route definitions
+│   ├── utils/          # helpers (correlationId, logger)
+│   └── app.js          # express app setup
+├── tests/              # test files
+├── .env.example        # env template
+├── .gitignore
+├── package.json
+└── README.md
