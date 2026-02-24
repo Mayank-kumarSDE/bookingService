@@ -1,63 +1,3 @@
-## Steps to setup the starter template
-
-1. Clone the project
-
-2. Move in to the folder structure
-
-
-
-
-3. Install npm dependencies
-    ``` npm i ````
-
-4. Create a new .env file in the root directory and add the `PORT` env variable
-```
-echo PORT=3000 >> .env
-```
-
-5. Start the express server
-'''
-npm run server
-'''
-
-
-
-HOW TO TEST THE API
-1. Start the server 
-    '''npm run server '''
-    You should see: {"level":"info","message":"Server listening on port 3000","timestamp":"..."}
-
-2. Test the Ping Endpoint Using Postman
-    URL - http://localhost:3000/ping
-    Headers - Content-Type: application/json
-    Body-{"name": "test"}
-
-3. Expected result 
-    {
-  "status": "success",
-  "message": "pong",
-  "correlationId": "abc-123-xyz"
-}
-
-4. Expected Terminal logs
-    {"level":"info","message":"Request received","correlationId":"abc-123-xyz","method":"POST","path":"/ping"}
-    {"level":"info","message":"Handling ping request","correlationId":"abc-123-xyz"}
-
-5. Test Validation Error
-   URL - http://localhost:3000/ping
-   Body - {"wrongField": "test"}
-   
-   Expected Response (400):
-   {
-     "status": "fail",
-     "message": "Validation failed",
-     "errors": [...]
-   }
-
-/// Markdown ///
-Correlation ID: A unique identifier for tracking requests across logs
-
-
 # backend-template
 
 > A production-ready Express.js starter template with logging, validation, and correlation ID tracking.
@@ -70,12 +10,9 @@ Correlation ID: A unique identifier for tracking requests across logs
 - [prerequisites](#-prerequisites)
 - [installation](#-installation)
 - [environment variables](#-environment-variables)
-- [available scripts](#-available-scripts)
 - [folder structure](#-folder-structure)
 - [testing the api](#-testing-the-api)
 - [correlation-id-logging](#-correlation-id-logging)
-- [contributing](#-contributing)
-- [license](#-license)
 
 ## ✨ features
 - 🔐 request validation with zod/joi
@@ -94,20 +31,29 @@ Correlation ID: A unique identifier for tracking requests across logs
    ```bash
    git clone https://github.com/Mayank-kumarSDE/backendTemplate.git
    cd backendTemplate
+   ```
 
 2. install dependencies
 ``` bash
     npm install
+```
 
 3. configure environment variables
 `` bash
     echo "PORT=3000" >> .env
     # add other vars as needed
+```
+
 4. start the development server
 ``` bash 
     npm run server
-
-## Folder structure
+```
+## environment Variables
+``` bash
+        PORT=""
+```
+## folder structure
+```bash
 backendTemplate/
 ├── src/
 │   ├── config/         # environment & app config
@@ -121,3 +67,46 @@ backendTemplate/
 ├── .gitignore
 ├── package.json
 └── README.md
+```
+## testing the api
+``` bash
+    1. Start the server 
+    '''npm run server '''
+    You should see: {"level":"info","message":"Server listening on port 3000","timestamp":"..."}
+
+    2. Test the Ping Endpoint Using Postman
+        URL - http://localhost:3000/ping
+        Headers - Content-Type: application/json
+        Body-{"name": "test"}
+
+    3. Expected result 
+    {
+        "status": "success",
+        "message": "pong",
+        "correlationId": "abc-123-xyz"
+    }
+
+    4. Expected Terminal logs
+        {"level":"info","message":"Request received","correlationId":"abc-123-xyz","method":"POST","path":"/ping"}
+        {"level":"info","message":"Handling ping request","correlationId":"abc-123-xyz"}
+
+    5. Test Validation Error
+    URL - http://localhost:3000/ping
+    Body - {"wrongField": "test"}
+    
+    Expected Response (400):
+    {
+        "status": "fail",
+        "message": "Validation failed",
+        "errors": [...]
+    }
+
+```
+## correlation-id-logging
+```bash
+    Every request gets a unique correlationId (via x-correlation-id header or auto-generated). This ID:
+    Appears in all logs for that request
+    Helps trace requests across services
+    Is returned in API responses for debugging
+    💡 Pro tip: Forward x-correlation-id in microservice calls for end-to-end tracing.
+```
