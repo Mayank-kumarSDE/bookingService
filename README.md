@@ -56,3 +56,41 @@ HOW TO TEST THE API
 
 /// Markdown ///
 Correlation ID: A unique identifier for tracking requests across logs
+
+
+# backend-template
+
+> A production-ready Express.js starter template with logging, validation, and correlation ID tracking.
+
+[![Node.js Version](https://img.shields.io/badge/node-%3E%3D18.x-brightgreen.svg)](https://nodejs.org/)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
+## 📋 table of contents
+- [features](#-features)
+- [prerequisites](#-prerequisites)
+- [installation](#-installation)
+- [environment variables](#-environment-variables)
+- [available scripts](#-available-scripts)
+- [folder structure](#-folder-structure)
+- [testing the api](#-testing-the-api)
+- [correlation-id-logging](#-correlation-id-logging)
+- [contributing](#-contributing)
+- [license](#-license)
+
+## ✨ features
+- 🔐 request validation with zod/joi
+- 🪪 automatic correlation-id generation for request tracing
+- 📝 structured logging with winston/pino
+- 🚀 scalable folder structure for microservices
+- 🧪 ready for unit/integration testing
+
+## 🛠 prerequisites
+- node.js >= 18.x
+- npm >= 9.x
+
+## 📦 installation
+
+1. clone the repository
+   ```bash
+   git clone https://github.com/Mayank-kumarSDE/backendTemplate.git
+   cd backendTemplate
