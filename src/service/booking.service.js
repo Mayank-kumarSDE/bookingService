@@ -20,6 +20,7 @@ export async function createBookingHelper(data){
     };
 
 }
+
 // confirmation phase 
 
 import { findIdempotencyKeyByKey, markIdempotencyKeyAsProcessed } from "../repositories/idempotency_keys.repo.js";
@@ -46,7 +47,7 @@ export async function confirmBookingHelper(idempotencyKey) {
 
     // Normal idempodent without concurrency taken care
 
-    
+
     /*
     const booking = await findBookingByIdempotencyKeyId(keyRecord.id);
     
@@ -78,11 +79,22 @@ export async function confirmBookingHelper(idempotencyKey) {
 
 
 
-    // i used optimistc locking here for reason read readmme file 
+    // i used optimistc locking here for reason read README file 
 
     // --- OPTIMISTIC LOCKING LOGIC STARTS HERE ---
 
     // 1. Attempt to confirm booking atomically
+    const booking = await findBookingByIdempotencyKeyId(keyRecord.id);
+    
+    if (!booking) {
+      throw new NotFoundError('bookingID is not Present in Database');
+    }
+
+    if (booking.status !== 'pending') {
+      const error = new Error(`Booking is already ${booking.status}`);
+      error.statusCode = 400;
+      throw error;
+    }
     const bookingUpdatedCount = await confirmBooking(booking.id);
 
     // 2. If 0 rows updated, someone else won the race
@@ -97,7 +109,7 @@ export async function confirmBookingHelper(idempotencyKey) {
             success: true,
             booking: existingBooking,
             alreadyProcessed: true,
-            message: 'Booking was already confirmed'
+            message: 'Booking operation completed successfully' 
         };
     }
 
@@ -112,6 +124,6 @@ export async function confirmBookingHelper(idempotencyKey) {
         success: true,
         booking: updatedBooking,
         alreadyProcessed: false,
-        message: 'Booking confirmed successfully'
+        message: 'Booking operation completed successfully' 
     };
 }

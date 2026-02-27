@@ -5,7 +5,7 @@ export default (sequelize, DataTypes) => {
   class Booking extends Model {
     static associate(models) {
       Booking.belongsTo(models.IdempotencyKey, {
-        foreignKey: 'idempotencyKeyId',
+        foreignKey: 'idempotency_key_id',
         as: 'idempotencyKey',
         onDelete: 'SET NULL'
       });
