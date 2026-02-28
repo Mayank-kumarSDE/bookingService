@@ -13,19 +13,17 @@ const validateRequestBody = (schema) => {
       // Log the actual error to see what it is
       logger.error('Validation error:', err);
       logger.error('Error type:', err.constructor.name);
-      
       if (err instanceof z.ZodError) {
         logger.error('ZodError detected, errors array:', err.errors);
         return res.status(400).json({
-          status: "fail",
-          message: "Validation failed",
-          errors: err.errors.map(e => ({
-            field: e.path.join('.'),
-            message: e.message
+        status: "fail",
+        message: "Validation failed",
+        errors: err.issues.map(issue => ({
+          field: issue.path.join('.'),
+             message: issue.message
           }))
-        });
-      }
-      
+    });
+}
       // For non-Zod errors
       return res.status(500).json({
         status: "error",

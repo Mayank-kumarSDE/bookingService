@@ -8,6 +8,7 @@ import  sequelize from './src/db/models/index.js';
 import Router from './src/router/index.js';
 const app = express();
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 app.use(attachCorrelationIdMiddleware)
 app.use(pingRouter)
 app.use(Router);
