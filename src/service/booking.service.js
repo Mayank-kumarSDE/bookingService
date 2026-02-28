@@ -3,22 +3,33 @@ import { generateIdempotencyKey } from "../utils/helper/getuuid.js";
 import { createIdempotencyKey } from "../repositories/idempotency_keys.repo.js";
 import { BadRequestError, InternalServerError, NotFoundError } from '../utils/errors/app.error.js';
 import logger from '../config/logger.config.js';
+import { serverConfig } from "../config/index.js";
+import {redlock} from "../config/redis.config.js"
 export async function createBookingHelper(data){
-    const bookingResponse = await createBooking(data);
-    logger.info(`Booking created: ${bookingResponse.id}`);
-    const idempotencyKey = generateIdempotencyKey();
-    logger.info(`idempotency key generated : ${idempotencyKey}`);
-    const idempotencyKeyResponse = await createIdempotencyKey(idempotencyKey);
-    logger.info(`idempotency key created: ${idempotencyKeyResponse.id}`);
-    await updateIdempotenyKeyId(bookingResponse.id, idempotencyKeyResponse.id);
-    logger.info(`Linked booking ${bookingResponse.id} to key ${idempotencyKey}`);
-    return {
-      success: true,
-      bookingId: bookingResponse.id,
-      idempotencyKey: idempotencyKeyResponse.key,
-      message: "Reservation created. Please confirm to complete booking."
-    };
-
+    const ttl = serverConfig.lock_ttl
+    const bookingResources = `hotel:${data.hotel_id}`;
+    let lock;
+    try{
+      lock = await redlock.acquire([bookingResources],ttl);
+      logger.info(`locked acquired for hotelid: ${bookingResources}`)
+      const bookingResponse = await createBooking(data);
+      logger.info(`Booking created: ${bookingResponse.id}`);
+      const idempotencyKey = generateIdempotencyKey();
+      logger.info(`idempotency key generated : ${idempotencyKey}`);
+      const idempotencyKeyResponse = await createIdempotencyKey(idempotencyKey);
+      logger.info(`idempotency key created: ${idempotencyKeyResponse.id}`);
+      await updateIdempotenyKeyId(bookingResponse.id, idempotencyKeyResponse.id);
+      logger.info(`Linked booking ${bookingResponse.id} to key ${idempotencyKey}`);
+      return {
+        success: true,
+        bookingId: bookingResponse.id,
+        idempotencyKey: idempotencyKeyResponse.key,
+        message: "Reservation created. Please confirm to complete booking."
+      };
+    }
+    catch(err){
+      throw new InternalServerError('Failed to acquire lock for booking resources')
+    }
 }
 
 // confirmation phase 

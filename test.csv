@@ -1,0 +1,6 @@
+// test.csv (all same hotel_id)
+user_id,hotel_id,total_guests,booking_amount
+1,434,2,1000
+2,434,2,1000
+3,434,2,1000
+4,434,2,1000

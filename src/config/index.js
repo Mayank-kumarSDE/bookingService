@@ -4,6 +4,8 @@ dotenv.config();
 
 export const serverConfig = {
   port: process.env.PORT || 3000,
+  redis_server_url : process.env.REDIS_SERVER_URL || 'redis://localhost:6379',
+  lock_ttl:parseInt(process.env.LOCK_TTL) ||60000
 };
 
 export const dbConfig = {
