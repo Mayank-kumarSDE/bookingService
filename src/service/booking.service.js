@@ -28,7 +28,7 @@ export async function createBookingHelper(data){
       };
     }
     catch(err){
-      throw new InternalServerError('Failed to acquire lock for booking resources')
+      throw new InternalServerError('this hotel is held by another user')
     }
 }
 
