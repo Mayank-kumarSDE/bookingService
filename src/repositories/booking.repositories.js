@@ -2,23 +2,34 @@ import { Booking } from '../db/models/index.js';
 import logger from '../config/logger.config.js';
 
 
-export async function createBooking(data){
-    const bookingResponse = await Booking.create({
-        user_id:data.user_id,
-        hotel_id:data.hotel_id,
-        total_guests:data.total_guests,
-        booking_amount: data.booking_amount
 
-    })
-    return bookingResponse;
+export async function createBooking(data, options = {}) {
+  const { transaction } = options;
+  
+  const bookingResponse = await Booking.create({
+    user_id: data.user_id,
+    hotel_id: data.hotel_id,
+    start_date: data.start_date,
+    end_date: data.end_date,
+    total_guests: data.total_guests,
+    booking_amount: data.booking_amount
+
+  }, { transaction });
+  
+  return bookingResponse;
 }
 
-
-export async function updateIdempotenyKeyId(bookingId, idempotencyKeyId) { 
+export async function updateIdempotencyKeyId(bookingId, idempotencyKeyId, options = {}) {
+  const { transaction } = options;
+  
   const [updatedCount] = await Booking.update(
-    { idempotencyKeyId: idempotencyKeyId },    
-    { where: { id: bookingId } }               
+    { idempotency_key_id: idempotencyKeyId },
+    { 
+      where: { id: bookingId },
+      transaction // Pass the transaction here
+    }
   );
+  
   return updatedCount;
 }
 //confirmation phase 

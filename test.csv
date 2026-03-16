@@ -1,6 +1,90 @@
-// test.csv (all same hotel_id)
-user_id,hotel_id,total_guests,booking_amount
-1,434,2,1000
-2,434,2,1000
-3,434,2,1000
-4,434,2,1000
+I built a hotel booking service and ran into two nasty backend problems. Here's how I solved them. 🧵
+
+---
+
+**Problem 1: The Double-Click Disaster 💸**
+
+User clicks "Confirm Booking" twice in 10ms.
+Result? Double charge. Duplicate booking. Angry customer.
+
+**Step 1 — Idempotency**
+
+First, we make the confirm endpoint idempotent. If two requests come from the same user, we make sure we don't do a double booking.
+
+Every booking gets a unique idempotency key (UUID). On confirmation:
+
+```sql
+UPDATE bookings
+SET status = 'confirmed'
+WHERE id = ? AND status = 'pending'
+```
+
+First request updates 1 row ✅
+Second request updates 0 rows → already processed ✅
+
+**Step 2 — But what if two requests from the same user arrive in parallel?**
+
+Idempotency alone isn't enough. What if both requests hit the server at the exact same time, both read status = 'pending', and both try to update simultaneously? They'd both succeed — double booking.
+
+That's where **Optimistic Locking** comes in. The DB update only wins if the row hasn't already been changed by another request. The second parallel request detects the conflict and backs off.
+
+**But why Optimistic Locking and not something heavier?**
+
+We know that the idempotency key and confirm booking endpoint are not going to be hit by hundreds of users — this request might come 3 or 4 times at most, from the same user whose earlier requests failed. Eventually one will succeed, and the user will see the successful state. It's not going to be a bad experience.
+
+Since we know different requests are coming from the same user and contention is low, optimistic locking is the perfect fit. No heavy locks, no blocking — just a cheap DB-level check.
+
+---
+
+**Problem 2: The Race Condition Overbooking 🏃‍♂️🏃‍♀️**
+
+Two different users try to book the same hotel at the exact same moment:
+
+```
+Time 0ms: User A checks → available ✅
+Time 1ms: User B checks → available ✅
+Time 2ms: User A books  → success ✅
+Time 3ms: User B books  → success ✅ (OVERBOOKING ❌)
+```
+
+We can solve this through various locking strategies — but not all of them are the right fit.
+
+**❌ Pessimistic Locking (SELECT FOR UPDATE)**
+
+Pessimistic locking has two serious problems in this scenario:
+
+*Problem 1 — The "Waiting Line" Problem (HTTP Timeouts):*
+Request A arrives, locks the row, starts processing (takes 2 seconds). Request B arrives, tries to lock the row — it waits. Request C arrives, tries to lock the row — it waits.
+
+Web browsers and API gateways like Nginx or AWS ALB have timeout limits (often 30–60 seconds, sometimes less). If Request A is slow due to database lag or a network issue, Requests B and C are blocked holding an open HTTP connection. If Request A takes longer than the HTTP timeout, Requests B and C crash with a Timeout Error on the frontend — even though the backend eventually succeeds. The user sees "Error" on their screen, even though the booking actually succeeded.
+
+*Problem 2 — The Database Connection Pool Problem:*
+While Request B is waiting for Request A to release the lock, Request B is holding a database connection open. If 10 users double-click (40 requests), and they all get queued behind 10 slow requests, you might have 40 database connections open simultaneously. If your database connection pool limit is 20, your entire application crashes for other users too.
+
+**❌ Optimistic Locking**
+
+Works for low contention, but here hundreds of users could be hitting the same hotel simultaneously. They'd all read "available", most would fail at the write step and need to retry — creating a thundering herd of retries. Poor experience and wasteful.
+
+**✅ Distributed Locking (Redlock)**
+
+Redlock acquires a lock in Redis — outside the DB entirely. It works across multiple servers, doesn't hold DB connections open, and has a clear TTL so it auto-expires if something goes wrong.
+
+```js
+const lock = await redlock.acquire(['hotel:8'], 300_000);
+```
+
+First request acquires the lock. Second user gets a clear "hotel is currently held" error instantly. No waiting, no connection pool drain, no overbooking. That's why Redlock is the right tool here.
+
+---
+
+**Key takeaways:**
+→ Idempotency keys prevent double bookings from the same user
+→ Optimistic locking handles low-contention parallel requests cheaply
+→ Pessimistic locking causes HTTP timeouts and connection pool exhaustion at scale
+→ Distributed locking (Redlock) is the right tool when contention is high and the system is horizontally scaled
+→ Choosing the right locking strategy is about understanding your traffic model, not just picking a pattern
+
+Full code + README on my GitHub 👇
+https://github.com/Mayank-kumarSDE/bookingService
+
+#backend #nodejs #redis #systemdesign #webdevelopment #distributedsystems #programming

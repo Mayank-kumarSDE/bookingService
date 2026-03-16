@@ -1,13 +1,16 @@
 import {IdempotencyKey} from '../db/models/index.js';
 import logger from '../config/logger.config.js';
-export async function createIdempotencyKey(data){
-    const idempotencyKeyResponse = await IdempotencyKey.create({
-        key:data,
-        is_processed: false
-    })
-    return idempotencyKeyResponse;
+export async function createIdempotencyKey(data, options = {}) {
+  const { transaction } = options;
+  
+  // data.key should be just the string UUID
+  const idempotencyKeyResponse = await IdempotencyKey.create({
+    key: data.key, 
+    is_processed: false
+  }, { transaction });
+  
+  return idempotencyKeyResponse;
 }
-
 // confirmation phase 
 /*
  Find idempotency key by UUID

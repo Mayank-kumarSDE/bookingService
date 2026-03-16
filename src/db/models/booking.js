@@ -27,6 +27,14 @@ export default (sequelize, DataTypes) => {
       type: DataTypes.INTEGER,
       allowNull: false
     },
+      start_date: {
+      type: DataTypes.DATE,
+      allowNull: false
+    },
+    end_date: {
+      type: DataTypes.DATE,
+      allowNull: false
+    },
     total_guests: {
       type: DataTypes.INTEGER,
       allowNull: false,

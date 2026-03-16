@@ -1,35 +1,94 @@
-import { createBooking, updateIdempotenyKeyId } from "../repositories/booking.repositories.js";
+import { createBooking, updateIdempotencyKeyId } from "../repositories/booking.repositories.js";
 import { generateIdempotencyKey } from "../utils/helper/getuuid.js";
 import { createIdempotencyKey } from "../repositories/idempotency_keys.repo.js";
 import { BadRequestError, InternalServerError, NotFoundError } from '../utils/errors/app.error.js';
 import logger from '../config/logger.config.js';
 import { serverConfig } from "../config/index.js";
 import {redlock} from "../config/redis.config.js"
-export async function createBookingHelper(data){
-    const ttl = serverConfig.lock_ttl
-    const bookingResources = `hotel:${data.hotel_id}`;
-    let lock;
-    try{
-      lock = await redlock.acquire([bookingResources],ttl);
-      logger.info(`locked acquired for hotelid: ${bookingResources}`)
-      const bookingResponse = await createBooking(data);
-      logger.info(`Booking created: ${bookingResponse.id}`);
-      const idempotencyKey = generateIdempotencyKey();
-      logger.info(`idempotency key generated : ${idempotencyKey}`);
-      const idempotencyKeyResponse = await createIdempotencyKey(idempotencyKey);
-      logger.info(`idempotency key created: ${idempotencyKeyResponse.id}`);
-      await updateIdempotenyKeyId(bookingResponse.id, idempotencyKeyResponse.id);
-      logger.info(`Linked booking ${bookingResponse.id} to key ${idempotencyKey}`);
-      return {
-        success: true,
-        bookingId: bookingResponse.id,
-        idempotencyKey: idempotencyKeyResponse.key,
-        message: "Reservation created. Please confirm to complete booking."
-      };
+import { Op } from 'sequelize';
+import { Booking } from '../db/models/index.js'; // Import Booking model
+import { sequelize } from '../db/models/index.js'; // Import the sequelize instance
+
+export async function createBookingHelper(data) {
+  const { hotel_id, start_date, end_date, user_id, total_guests, booking_amount } = data;
+  const ttl = serverConfig.lock_ttl;
+  const bookingResources = `hotel:${hotel_id}`;
+  let lock = null;
+  let t;
+
+  try {
+    // 1. ACQUIRE REDIS LOCK FIRST
+    lock = await redlock.acquire([bookingResources], ttl);
+    logger.info(`Lock acquired for hotelId: ${bookingResources}`);
+
+    // 2. CHECK OVERLAPS OUTSIDE TRANSACTION (but inside Redis lock)
+    const overlappingBooking = await Booking.findOne({
+      where: {
+        hotel_id: hotel_id,
+        status: { [Op.in]: ['confirmed', 'pending'] },
+        start_date: { [Op.lt]: new Date(end_date) },
+        end_date: { [Op.gt]: new Date(start_date) }
+      }
+      // NO transaction needed here since Redis lock protects us
+    });
+
+    if (overlappingBooking) {
+      throw new BadRequestError('These dates are unavailable.');
     }
-    catch(err){
-      throw new InternalServerError('this hotel is held by another user')
+
+    // 3. ONLY START TRANSACTION IF OVERLAP CHECK PASSES
+    t = await sequelize.transaction();
+
+    // 4. CREATE BOOKING (Inside Transaction)
+  const bookingResponse = await createBooking({
+    user_id,
+    hotel_id,
+    start_date,
+    end_date,
+    total_guests,
+    booking_amount
+  }, { transaction: t });
+
+    // 5. CREATE IDEMPOTENCY KEY (Inside Transaction)
+    const idempotencyKey = generateIdempotencyKey();
+    const idempotencyKeyResponse = await createIdempotencyKey(
+      { key: idempotencyKey }, 
+      { transaction: t }
+    );
+
+    // 6. LINK THEM (Inside Transaction)
+    await updateIdempotencyKeyId(
+            bookingResponse.id,
+            idempotencyKeyResponse.id,
+            { transaction: t }
+    );
+
+    // 7. COMMIT
+    await t.commit();
+    logger.info(`Transaction committed for booking ${bookingResponse.id}`);
+
+    return {
+      success: true,
+      bookingId: bookingResponse.id,
+      idempotencyKey: idempotencyKeyResponse.key,
+      message: "Reservation created. Please confirm."
+    };
+
+  } catch (err) {
+    if (t) {
+      await t.rollback();
+      logger.warn(`Transaction rolled back for hotel ${hotel_id}`);
     }
+    
+    logger.error(`Booking process failed:`, err);
+    if (err instanceof BadRequestError) throw err;
+    throw new InternalServerError('Failed to create booking');
+    
+  } finally {
+    if (lock) {
+      await lock.release().catch((e) => logger.error("Lock release failed", e));
+    }
+  }
 }
 
 // confirmation phase 
@@ -114,6 +173,11 @@ export async function confirmBookingHelper(idempotencyKey) {
         
         // Ensure key is marked processed so next click hits the FAST PATH
         await markIdempotencyKeyAsProcessed(keyRecord.id);
+        const markResult = await markIdempotencyKeyAsProcessed(keyRecord.id);
+    
+        if (markResult === 0) {
+          logger.debug(`Key ${keyRecord.id} was already marked processed by the winner.`);
+        }
         
         const existingBooking = await findBookingByIdempotencyKeyId(keyRecord.id);
         return {
@@ -125,16 +189,21 @@ export async function confirmBookingHelper(idempotencyKey) {
     }
 
     // 3. If we get here, WE won the race. Mark the key as processed.
-    await markIdempotencyKeyAsProcessed(keyRecord.id);
-    logger.info(`Idempotency key ${keyRecord.id} marked as processed`);
-
+    // --- I WON THE RACE ---
+    // Now, atomically mark the key as processed.
+    const markResult = await markIdempotencyKeyAsProcessed(keyRecord.id);
+    if (markResult === 0) {
+      // This is an unexpected state. We won the booking update but failed to mark the key.
+      // It could mean the key was somehow modified between our checks. Log it for investigation.
+       logger.error(`Critical: Won booking race for ${booking.id} but failed to mark key ${keyRecord.id} as processed.`);
+    }
     const updatedBooking = await findBookingByIdempotencyKeyId(keyRecord.id);
     logger.info(`Booking ${booking.id} confirmed successfully`);
 
     return {
-        success: true,
-        booking: updatedBooking,
-        alreadyProcessed: false,
-        message: 'Booking operation completed successfully' 
+      success: true,
+      booking: updatedBooking,
+      alreadyProcessed: false, // We performed the action
+      message: 'Booking operation completed successfully'
     };
 }

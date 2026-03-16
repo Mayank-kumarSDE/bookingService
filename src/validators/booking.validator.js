@@ -16,6 +16,26 @@ export const createBookingSchema = z.object({
     .int()
     .positive('Hotel ID must be a positive integer'),
 
+ start_date: z.string({
+    required_error: 'Start date is required',
+    invalid_type_error: 'Start date must be a string',
+  })
+  .refine((val) => !isNaN(Date.parse(val)), {
+    message: 'Start date must be a valid date format (ISO 8601)',
+  })
+  .refine((val) => new Date(val) > new Date(), {
+    message: 'Start date must be in the future',
+  }),
+
+  end_date: z.string({
+    required_error: 'End date is required',
+    invalid_type_error: 'End date must be a string',
+  })
+  .refine((val) => !isNaN(Date.parse(val)), {
+    message: 'End date must be a valid date format (ISO 8601)',
+  }),
+
+
   total_guests: z
     .number({
       required_error: 'Total guests is required',
