@@ -115,40 +115,6 @@ export async function confirmBookingHelper(idempotencyKey) {
       };
     }
 
-    // Normal idempodent without concurrency taken care
-
-
-    /*
-    const booking = await findBookingByIdempotencyKeyId(keyRecord.id);
-    
-    if (!booking) {
-      throw new NotFoundError('bookingID is not Present in Database');
-    }
-
-    if (booking.status !== 'pending') {
-      const error = new Error(`Booking is already ${booking.status}`);
-      error.statusCode = 400;
-      throw error;
-    }
-
-    await confirmBooking(booking.id);
-    logger.info(`Booking ${booking.id} status changed from 'pending' to 'confirmed'`);
-    await markIdempotencyKeyAsProcessed(keyRecord.id);
-    logger.info(`Idempotency key ${keyRecord.id} marked as processed`);
-    const updatedBooking = await findBookingByIdempotencyKeyId(keyRecord.id);
-    logger.info(`Booking ${booking.id} confirmed successfully`);
-
-    return {
-      success: true,
-      booking: updatedBooking,
-      alreadyProcessed: false,
-      message: 'Booking confirmed successfully'
-    };
-    */
-
-
-
-
     // i used optimistc locking here for reason read README file 
 
     // --- OPTIMISTIC LOCKING LOGIC STARTS HERE ---

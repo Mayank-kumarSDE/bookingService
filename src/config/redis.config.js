@@ -2,7 +2,9 @@ import IORedis from 'ioredis';
 import Redlock from 'redlock';
 import { serverConfig } from './index.js';
 
-export const redisClient = new IORedis(serverConfig.redis_server_url);
+export const redisClient = new IORedis(serverConfig.redis_server_url, {
+  maxRetriesPerRequest: null, // This is the critical fix
+});
 
 export const redlock = new Redlock([redisClient], {
     driftFactor: 0.01, // time in ms
