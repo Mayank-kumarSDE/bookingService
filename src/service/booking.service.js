@@ -8,6 +8,7 @@ import {redlock} from "../config/redis.config.js"
 import { Op } from 'sequelize';
 import { Booking } from '../db/models/index.js'; // Import Booking model
 import { sequelize } from '../db/models/index.js'; // Import the sequelize instance
+import { addBookingConfirmationToQueue } from "../producers/mailer.producer.js";
 
 export async function createBookingHelper(data) {
   const { hotel_id, start_date, end_date, user_id, total_guests, booking_amount } = data;
@@ -165,6 +166,28 @@ export async function confirmBookingHelper(idempotencyKey) {
     }
     const updatedBooking = await findBookingByIdempotencyKeyId(keyRecord.id);
     logger.info(`Booking ${booking.id} confirmed successfully`);
+
+        // NOTIFICATON  BLOCK START
+    try {
+      const notificationData = {
+        booking_id: updatedBooking.id,
+        // HARDCODED FOR TESTING
+        user_email: "psanjeevkumar335@gmail.com", 
+        user_name: "Mayank Kumar",
+        hotel_name: "Grand Plaza Hotel", 
+        start_date: updatedBooking.start_date,
+        end_date: updatedBooking.end_date,
+      };
+
+      // Fire and forget
+      addBookingConfirmationToQueue(notificationData)
+        .catch(err => logger.error('Failed to queue booking confirmation email:', err));
+      
+      logger.info(`Notification queued for booking ${updatedBooking.id}`);
+    } catch (error) {
+      logger.error('Error preparing booking confirmation notification:', error);
+    }
+    // NOTIFCATION BLOCK END
 
     return {
       success: true,
