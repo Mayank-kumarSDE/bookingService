@@ -12,7 +12,8 @@ export async function createBooking(data, options = {}) {
     start_date: data.start_date,
     end_date: data.end_date,
     total_guests: data.total_guests,
-    booking_amount: data.booking_amount
+    booking_amount: data.booking_amount,
+    expires_at: data.expires_at   // ← was missing, causing ghost bookings to never expire
 
   }, { transaction });
   

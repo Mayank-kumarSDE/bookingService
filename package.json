@@ -1,5 +1,7 @@
 {
   "dependencies": {
+    "@bull-board/api": "^6.20.6",
+    "@bull-board/express": "^6.20.6",
     "async_hooks": "^1.0.0",
     "bullmq": "^5.71.0",
     "crypto": "^1.0.1",
@@ -7,6 +9,7 @@
     "express": "^5.2.1",
     "ioredis": "^5.10.0",
     "mysql2": "^3.18.0",
+    "node-cron": "^4.2.1",
     "path": "^0.12.7",
     "redlock": "^5.0.0-beta.2",
     "sequelize": "^6.37.7",

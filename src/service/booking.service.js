@@ -23,10 +23,18 @@ export async function createBookingHelper(data) {
     logger.info(`Lock acquired for hotelId: ${bookingResources}`);
 
     // 2. CHECK OVERLAPS OUTSIDE TRANSACTION (but inside Redis lock)
+    //    - confirmed bookings always block
+    //    - pending bookings only block if they haven't expired yet
     const overlappingBooking = await Booking.findOne({
       where: {
         hotel_id: hotel_id,
-        status: { [Op.in]: ['confirmed', 'pending'] },
+        [Op.or]: [
+          { status: 'confirmed' },
+          {
+            status: 'pending',
+            expires_at: { [Op.gt]: new Date() }  // only live pending blocks
+          }
+        ],
         start_date: { [Op.lt]: new Date(end_date) },
         end_date: { [Op.gt]: new Date(start_date) }
       }
@@ -41,13 +49,17 @@ export async function createBookingHelper(data) {
     t = await sequelize.transaction();
 
     // 4. CREATE BOOKING (Inside Transaction)
+  // Set expires_at = LOCK_TTL + 5 min buffer (gives user time to confirm while lock is held)
+  const expiresAt = new Date(Date.now() + ttl + 5 * 60 * 1000);
+
   const bookingResponse = await createBooking({
     user_id,
     hotel_id,
     start_date,
     end_date,
     total_guests,
-    booking_amount
+    booking_amount,
+    expires_at: expiresAt
   }, { transaction: t });
 
     // 5. CREATE IDEMPOTENCY KEY (Inside Transaction)
@@ -172,7 +184,7 @@ export async function confirmBookingHelper(idempotencyKey) {
       const notificationData = {
         booking_id: updatedBooking.id,
         // HARDCODED FOR TESTING
-        user_email: "psanjeevkumar335@gmail.com", 
+        user_email: "321mayankkumar@gmail.com", 
         user_name: "Mayank Kumar",
         hotel_name: "Grand Plaza Hotel", 
         start_date: updatedBooking.start_date,
@@ -181,7 +193,10 @@ export async function confirmBookingHelper(idempotencyKey) {
 
       // Fire and forget
       addBookingConfirmationToQueue(notificationData)
-        .catch(err => logger.error('Failed to queue booking confirmation email:', err));
+        .catch(err => {
+          logger.error(`[Metrics] CRITICAL: Failed to queue booking confirmation email for booking ${updatedBooking.id}`);
+          logger.error(`[Metrics] Reason: ${err.message}`);
+        });
       
       logger.info(`Notification queued for booking ${updatedBooking.id}`);
     } catch (error) {

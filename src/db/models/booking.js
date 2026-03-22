@@ -63,6 +63,11 @@ export default (sequelize, DataTypes) => {
       allowNull: true,
       defaultValue: DataTypes.NOW
     },
+    expires_at: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      defaultValue: null
+    },
     updated_at: {
       type: DataTypes.DATE,
       allowNull: true,
