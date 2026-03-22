@@ -45,6 +45,15 @@ Time 3ms:  User B creates booking     → Success ✅ (OVERBOOKING! ❌)
 
 ---
 
+### Problem 3: Ghost Bookings (Inventory Blocking)
+
+**Issue:** A user starts a booking (acquiring a lock) but never completes the payment/confirmation. The hotel remains stuck in a `pending` state forever, blocking other users.
+
+**Solution:** Time-to-Live (TTL) `expires_at` Column + Node-Cron Cleanup Job.
+Pending bookings automatically expire after 15 minutes, instantly freeing up the dates in overlap queries, and a background cron job periodically sweeps them to `cancelled`.
+
+---
+
 ## 🔒 Booking Flow
 
 ### Phase 1: Create Booking
@@ -122,6 +131,37 @@ Request A:                              Request B:
 
 Result: Only ONE booking confirmed ✅
 ```
+
+---
+
+## 📬 Asynchronous Notifications
+
+To prevent the Booking Service from hanging while sending emails, we decoupled notifications using a **Redis-backed Message Queue (BullMQ)**.
+
+1. User confirms booking ✅
+2. Booking status updates to `confirmed` ✅
+3. **Fire-and-forget** job is pushed to `queue-mailer` 📥
+4. Notification Service (Consumer) picks up the job and sends the email 📧
+
+**Monitoring:** We use `@bull-board` integrated into the Express app to visually monitor queue latency, throughput, and failed jobs in real-time.
+
+---
+
+## 🚦 Load Testing & Race Condition Validation (K6)
+
+We ran aggressive load tests using **K6** to mathematically prove the Redlock mechanism prevents overbooking.
+
+**The Test:** 50 concurrent virtual users attempting to book the *exact same hotel* at the *exact same millisecond*.
+
+**The Results (from K6 Output):**
+
+```text
+checks_total.......: 482
+✓ is created (201).................: 1 / 240   (Exactly 1 success)
+✓ is locked/rejected (400/500).....: 240 / 1   (Exactly 240 rejected)
+```
+
+**Conclusion:** The backend successfully survived an extreme race condition. The distributed lock flawlessly allowed exactly *one* person through and perfectly defended the hotel dates from the other 240 attempts, completely solving the overbooking problem.
 
 ---
 
@@ -248,15 +288,21 @@ LOCK_TTL = 600000
 ```
 bookingService/
 ├── src/
-│   ├── config/         # DB, Redis, and app configuration
-│   ├── controllers/    # Request handlers (booking, confirmation)
-│   ├── middlewares/    # Validation, error handling, correlation ID
-│   ├── router/         # API route definitions
-│   ├── utils/          # Redlock setup, idempotency helpers, logger
-│   └── validators/     # Zod/Joi request schemas
-├── server.js
+│   ├── config/         # App, DB, Redis, and Bull-Board configuration
+│   ├── controller/     # Request endpoints (booking, confirmation)
+│   ├── db/             # Sequelize models, migrations, and seeders
+│   ├── jobs/           # Node-Cron jobs (stale booking cleanup)
+│   ├── middleware/     # Global error handling, correlation ID
+│   ├── producers/      # Email job publishers (addBookingConfirmationToQueue)
+│   ├── queues/         # BullMQ setup and QueueEvents listeners
+│   ├── repositories/   # Direct DB queries (Booking, Idempotency)
+│   ├── router/         # Express API route mapping
+│   ├── service/        # Core business logic (Redlock, overlap checks)
+│   ├── utils/          # Helpers (UUID gen, redlock init, logger)
+│   └── validators/     # Request schema validations
+├── server.js           # Server entry point
+├── k6-test.js          # Load testing script (Race condition validation)
 ├── .sequelizerc
-├── .gitignore
 ├── package.json
 └── README.md
 ```
